@@ -1,5 +1,6 @@
 // Layout-aware, deterministic PDF analysis. No network or language-model calls.
 import {clean,wordCount} from './structure.js';
+import {annotateParagraphLayout,segmentParagraphs,collectFootnotes} from './pdf-paragraphs.js';
 const median=a=>{const b=a.filter(Number.isFinite).sort((a,b)=>a-b);return b.length?b[Math.floor(b.length/2)]:0;};
 const itWords=new Set('di che la il lo gli le una un uno del della delle degli dello dei da per con non sono si nel nella nelle al alla alle anche come questo questa questi queste ma più essere tra sulla sul suo sua loro quello quella quando perché ogni quindi fra dalle dalla era viene nostro nostre nostri alle quale tutto tutti della ossia oppure soltanto senza abbia possiamo ciò'.split(' '));
 const enWords=new Set('the of and to in that is it a an we our us they their this these those which with from for as be are not but have has had all can must any by on or at there what when than them its were been would should may will into such same upon therefore only without every itself themselves nothing shall'.split(' '));
@@ -37,8 +38,7 @@ export function preparePages(pages){
  // Remove isolated marginal pagination without touching inline note references.
  p.body=p.body.filter(l=>!(l.x>p.width*.90&&l.text.length<8));
  p.body=p.body.filter((l,i,all)=>!(l.y>p.height*.94&&structuralHeading(l.text)?.kind==='extra'&&all.some(o=>o!==l&&o.y<p.height*.94&&titleKey(o.text)===titleKey(l.text))));
- p.notes=p.body.filter(l=>l.h<p.bodySize*.82&&l.y<p.height*.42&&l.text.length>4);
- p.body=p.body.map(l=>({...l,note:p.notes.includes(l)}));
+ annotateParagraphLayout(p,structuralHeading);
  const lang=languageOf(p.body.filter(l=>!l.note).map(l=>l.text).join(' '));Object.assign(p,lang);
  if(p.body.some(l=>/^(bibliografia|note del traduttore|glossario)\b/i.test(l.text)))p.language='it';
  }
@@ -88,18 +88,6 @@ function headingBoundaries(pages,tocEnd){
  }
  }}return result;
 }
-function joinText(a,b){if(!a)return b;if(/\p{L}[-‐]\s*$/u.test(a)&&/^\p{Ll}/u.test(b))return a.replace(/[-‐]\s*$/,'')+b;return a+' '+b;}
-function segmentLines(chunks,includeNotes){
- const result=[],refs=[];let current='',start=null,last=null;
- function flush(){if(current.trim()){result.push(clean(current));refs.push({startPage:start+1,endPage:last+1});}current='';start=null;}
- let previousLanguage=null;for(const {page,lines} of chunks){if(previousLanguage&&previousLanguage!==page.language)flush();previousLanguage=page.language;const eligible=lines.filter(l=>includeNotes||!l.note);const bodyLines=eligible.filter(l=>l.right-l.x>page.width*.50&&l.h>page.bodySize*.82);const left=bodyLines.length?bodyLines.map(l=>l.x).sort((a,b)=>a-b)[Math.floor(bodyLines.length*.2)]:Math.min(...eligible.filter(l=>!structuralHeading(l.text)).map(l=>l.x),page.width); 
- const gaps=eligible.slice(1).map((l,i)=>eligible[i].y-l.y).filter(g=>g>page.bodySize*.7&&g<page.bodySize*1.8);const gap=median(gaps)||page.bodySize*1.2;
- for(let i=0;i<eligible.length;i++){const l=eligible[i],prev=eligible[i-1],heading=structuralHeading(l.text);const indent=l.x-left>Math.max(4,page.bodySize*.48)&&l.x-left<page.width*.17;const centered=l.x>left+page.width*.18&&(l.right-l.x)<page.width*.8;
- const separate=heading||centered||indent&&current||prev&&(prev.y-l.y>gap*1.55||prev.note!==l.note||structuralHeading(prev.text));
- if(separate)flush();if(start===null)start=page.pageIndex;last=page.pageIndex;current=joinText(current,l.text);if(heading||centered)flush();}
- }
- flush();return {paragraphs:result,paragraphSources:refs};
-}
 function makeChapters(pages,boundaries,language,notes){
  const stream=pages.filter(p=>language==='original'||p.language===language);if(!stream.length)return [];
  const allowed=new Set(stream.map(p=>p.pageIndex));const points=boundaries.filter(b=>allowed.has(b.page)).sort((a,b)=>a.page-b.page||a.line-b.line).filter((b,i,a)=>!i||b.page!==a[i-1].page||b.line!==a[i-1].line);
@@ -110,8 +98,8 @@ function makeChapters(pages,boundaries,language,notes){
  const firstChunk=chunks[0];if(firstChunk&&b.method!=='front-matter'&&structuralHeading(firstChunk.lines[0]?.text||'')?.kind==='section'){
   let skip=1;while(skip<firstChunk.lines.length&&skip<=3){const line=firstChunk.lines[skip];if(line.x<=firstChunk.page.width*.18||structuralHeading(line.text))break;const known=b.method==='printed-toc'||b.method==='facing-toc'||titleKey(b.title).includes(titleKey(line.text));if(!known)break;skip++;}firstChunk.lines=firstChunk.lines.slice(skip);
  }
- const content=segmentLines(chunks,notes);if(!content.paragraphs.length)continue;
- chapters.push({title:b.title,path:b.path,language:language==='original'?b.language:language,method:b.method,...content,text:content.paragraphs.join('\n\n'),pageIndices,startPage:pageIndices[0],endPage:pageIndices.at(-1)+1,pdfApproximate:b.line>0||!!end&&end.line>0});}
+ const content=segmentParagraphs(chunks);const detectedFootnotes=collectFootnotes(chunks);const footnotes=notes?detectedFootnotes:[];if(!content.paragraphs.length)continue;
+ chapters.push({title:b.title,path:b.path,language:language==='original'?b.language:language,method:b.method,...content,detectedFootnotes,footnotes,text:content.paragraphs.join('\n\n'),pageIndices,startPage:pageIndices[0],endPage:pageIndices.at(-1)+1,pdfApproximate:b.line>0||!!end&&end.line>0});}
  return chapters;
 }
 export function analyzePdf(pages,entries=[]){

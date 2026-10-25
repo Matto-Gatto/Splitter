@@ -18,7 +18,9 @@ npm run dev
 - Indice EPUB 3, indice NCX EPUB 2, ripiego sull'ordine di lettura.
 - PDF: verifica dei segnalibri (esclude etichette numeriche per pagina), lettura del sommario stampato con verifica dei titoli e ripiego sui titoli nel testo.
 - Edizioni italiano/inglese a fronte: rilevamento della lingua sul corpo di ogni pagina, viste per lingua, entrambe separate e ordine originale completo. Le pagine incerte sono conservate nelle viste complete.
-- Ricostruzione delle righe per coordinate, paragrafi dai rientri e dagli spazi, ricomposizione delle parole con trattino a fine riga, prosecuzione su pagine della stessa lingua, filtro intestazioni e note facoltative.
+- Ricostruzione delle righe per coordinate; capoversi da rientri e spaziatura, con stima dei margini sull'intera pagina e compensazione dell'inclinazione della scansione. I titoli strutturali e i segni OCR isolati non sono contati come capoversi.
+- Le note sono riconosciute come blocchi contigui, mantenute separate dal testo e disponibili in un riquadro dedicato e nella cartella `note/` dello ZIP. Attivare o nascondere le note non modifica i capoversi del corpo del libro, né la prosecuzione tra pagine.
+- Correzione manuale dei capoversi: il comando **Correggi paragrafi** apre un editor dove una riga vuota indica una separazione. Le correzioni valgono per lettura ed esportazioni testuali; le pagine PDF originali non vengono riscritte.
 - Percorso libro/parte e riferimenti alle pagine PDF nei paragrafi e nell'esportazione JSON.
 - Revisione dell'indice, ricerca, selezione, rinomina, divisione a inizio paragrafo e unione.
 - ZIP con capitoli TXT, Markdown o JSON, paragrafi TXT e indice JSON.
@@ -27,7 +29,7 @@ npm run dev
 
 ## Limiti
 
-I PDF devono contenere testo estraibile: OCR e correzione degli errori OCR non inclusi. EPUB protetti da DRM non supportati. La divisione automatica PDF e il rilevamento italiano/inglese dipendono dall'impaginazione e vanno verificati; i testi con più lingue nella stessa pagina o colonne complesse richiedono revisione. Il rilevamento delle note è euristico. Cambiare lingua o inclusione delle note ricostruisce l'indice, previa conferma se sono presenti modifiche manuali. I capitoli PDF sulla stessa pagina non si possono separare conservando le pagine originali; in quel caso usare la divisione testuale. I libri restano in memoria fino alla chiusura della pagina, senza salvataggio persistente. I caratteri web sono caricati da Google Fonts; il contenuto dei libri non viene trasmesso.
+I PDF devono contenere testo estraibile: OCR e correzione degli errori OCR non inclusi. EPUB protetti da DRM non supportati. La divisione automatica PDF e il rilevamento italiano/inglese dipendono dall'impaginazione e vanno verificati; i testi con più lingue nella stessa pagina o colonne complesse richiedono revisione. Il rilevamento delle note è euristico. Cambiare lingua ricostruisce l'indice, previa conferma se sono presenti modifiche manuali. Mostrare o nascondere le note conserva le correzioni ai capoversi. I capitoli PDF sulla stessa pagina non si possono separare conservando le pagine originali; in quel caso usare la divisione testuale. I libri restano in memoria fino alla chiusura della pagina, senza salvataggio persistente. I caratteri web sono caricati da Google Fonts; il contenuto dei libri non viene trasmesso.
 
 ## Verifica su un PDF locale
 
