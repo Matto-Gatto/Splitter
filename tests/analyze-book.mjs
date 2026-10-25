@@ -1,0 +1,9 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {layoutPage,analyzePdf,rebuildPdf} from '../src/pdf-structure.js';
+const task=getDocument({data:new Uint8Array(await readFile(process.argv[2])),useSystemFonts:true});const pdf=await task.promise;const pages=[];const started=Date.now();
+for(let n=1;n<=pdf.numPages;n++){const page=await pdf.getPage(n),v=page.getViewport({scale:1}),text=await page.getTextContent();pages.push(layoutPage(text.items,v.width,v.height,n-1));page.cleanup();if(n%200===0)console.log('READ',n,Math.round((Date.now()-started)/1000)+'s');}
+const entries=[];async function walk(nodes){for(const n of nodes||[]){const d=typeof n.dest==='string'?await pdf.getDestination(n.dest):n.dest;if(d)entries.push({title:n.title,page:typeof d[0]==='number'?d[0]:await pdf.getPageIndex(d[0])});await walk(n.items);}}await walk(await pdf.getOutline());
+const a=analyzePdf(pages,entries);const report={pages:pages.length,counts:a.counts,bilingual:a.bilingual,alternating:a.alternating,ignoredBookmarks:a.ignoredBookmarks,printedEntries:a.printedEntries,tocPages:a.tocPages,removedHeaders:a.removedHeaders,results:{}};
+for(const language of ['it','en','both','original']){const b=rebuildPdf(a,{language});report.results[language]={outline:b.chapters.map(c=>({title:c.title,page:c.startPage+1,method:c.method})),chapters:b.chapters.length,paragraphs:b.chapters.reduce((n,c)=>n+c.paragraphs.length,0),first:b.chapters.slice(0,12).map(c=>({title:c.title,path:c.path,page:c.startPage+1,paragraphs:c.paragraphs.length,language:c.language,method:c.method})),last:b.chapters.slice(-5).map(c=>({title:c.title,page:c.startPage+1})),pageCount:new Set(b.chapters.flatMap(c=>c.pageIndices)).size};}
+console.log(JSON.stringify(report,null,2));if(process.argv[3])await writeFile(process.argv[3],JSON.stringify(report,null,2));await task.destroy();

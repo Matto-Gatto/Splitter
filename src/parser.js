@@ -1,7 +1,8 @@
 import * as pdfjs from 'pdfjs-dist';
 import worker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import JSZip from 'jszip';
-import {clean,paragraphs,fromHeadings,normalizePath} from './structure';
+import {clean,paragraphs,normalizePath} from './structure';
+import {layoutPage,analyzePdf,rebuildPdf} from './pdf-structure.js';
 pdfjs.GlobalWorkerOptions.workerSrc=worker;
 const xml=s=>new DOMParser().parseFromString(s,'application/xml');
 const els=(d,name)=>Array.from(d.getElementsByTagNameNS('*',name));
@@ -21,14 +22,20 @@ export async function parseEpub(file,progress){
  }if(!chapters.length)throw new Error('Nessun testo leggibile trovato nell’EPUB.');return {title,author,chapters,source,type:'EPUB'};
 }
 export async function parsePdf(file,progress){
- const bytes=new Uint8Array(await file.arrayBuffer());const pdf=await pdfjs.getDocument({data:bytes.slice()}).promise;const pages=[];
- for(let n=1;n<=pdf.numPages;n++){progress(`Lettura della pagina ${n} di ${pdf.numPages}…`);const page=await pdf.getPage(n);const content=await page.getTextContent();let lines=[],line='',lastY=null,lastH=0;
- for(const item of content.items){if(!('str'in item))continue;const y=item.transform[5];if(lastY!==null&&Math.abs(y-lastY)>Math.max(2,lastH*.4)){if(line)lines.push(line);if(Math.abs(y-lastY)>lastH*1.65)lines.push('');line='';}line+=(line?' ':'')+item.str;lastY=y;lastH=item.height||12;if(item.hasEOL){lines.push(line);line='';}}if(line)lines.push(line);pages.push(lines.join('\n'));}
- if(pages.join('').trim().length<30)throw new Error('Questo PDF sembra una scansione. Serve prima il riconoscimento del testo (OCR).');
+ const bytes=new Uint8Array(await file.arrayBuffer());let pdf,task;
+ try{
+ task=pdfjs.getDocument({data:bytes.slice(),useSystemFonts:true});pdf=await task.promise;const pages=[];
+ for(let n=1;n<=pdf.numPages;n++){
+  progress(`Analisi dell’impaginazione · pagina ${n} di ${pdf.numPages}…`);
+  const page=await pdf.getPage(n),content=await page.getTextContent(),viewport=page.getViewport({scale:1});
+  pages.push(layoutPage(content.items,viewport.width,viewport.height,n-1));page.cleanup();
+  if(n%8===0)await new Promise(resolve=>setTimeout(resolve,0));
+ }
+ if(pages.reduce((n,p)=>n+p.lines.reduce((s,l)=>s+l.text.length,0),0)<30)throw new Error('Questo PDF sembra una scansione senza testo OCR. Serve prima il riconoscimento del testo.');
  const meta=await pdf.getMetadata().catch(()=>null);const outline=await pdf.getOutline();const entries=[];
  async function walk(nodes){for(const node of nodes){try{const dest=typeof node.dest==='string'?await pdf.getDestination(node.dest):node.dest;if(dest){const index=typeof dest[0]==='number'?dest[0]:await pdf.getPageIndex(dest[0]);entries.push({title:node.title,page:index});}}catch{}if(node.items?.length)await walk(node.items);}}
- if(outline)await walk(outline);const unique=entries.filter((e,i)=>!entries.slice(0,i).some(p=>p.page===e.page)).sort((a,b)=>a.page-b.page);let chapters,source;
- if(unique.length){if(unique[0].page>0)unique.unshift({title:'Pagine iniziali',page:0});chapters=unique.map((e,i)=>{const end=unique[i+1]?.page??pdf.numPages;const text=pages.slice(e.page,end).join('\n\n');return {title:e.title,text,paragraphs:paragraphs(text),startPage:e.page,endPage:end};});source='Indice PDF';}
- else{chapters=fromHeadings(pages.join('\n\n'));source=chapters.length>1?'Titoli nel testo':'Indice da verificare';}
- return {title:meta?.info?.Title||file.name.replace(/\.pdf$/i,''),author:meta?.info?.Author||'Autore non indicato',chapters,source,type:'PDF',bytes,pages:pdf.numPages};
+ if(outline)await walk(outline);progress('Verifica dell’indice e separazione delle lingue…');await new Promise(resolve=>setTimeout(resolve,0));
+ const analysis=analyzePdf(pages,entries);const language=analysis.bilingual?'it':'original';const result=rebuildPdf(analysis,{language});
+ return {title:meta?.info?.Title||file.name.replace(/\.pdf$/i,''),author:meta?.info?.Author||'Autore non indicato',...result,analysis,type:'PDF',bytes,pages:pdf.numPages,ocrSource:/capture|ocr/i.test(meta?.info?.Producer||'')};
+ }finally{if(task)await task.destroy();}
 }
