@@ -1,6 +1,6 @@
 # Folio
 
-Web app in italiano per suddividere libri PDF ed EPUB in capitoli e paragrafi. Tutta l'elaborazione avviene nel browser.
+Web app in italiano per suddividere libri PDF ed EPUB in capitoli e paragrafi intesi come **sottosezioni con titolo o numero**. I capoversi tipografici restano nel testo di ciascuna sottosezione. Tutta l'elaborazione avviene nel browser.
 
 ## Avvio
 
@@ -20,7 +20,9 @@ npm run dev
 - Edizioni italiano/inglese a fronte: rilevamento della lingua sul corpo di ogni pagina, viste per lingua, entrambe separate e ordine originale completo. Le pagine incerte sono conservate nelle viste complete.
 - Ricostruzione delle righe per coordinate; capoversi da rientri e spaziatura, con stima dei margini sull'intera pagina e compensazione dell'inclinazione della scansione. I titoli strutturali e i segni OCR isolati non sono contati come capoversi.
 - Le note sono riconosciute come blocchi contigui, mantenute separate dal testo e disponibili in un riquadro dedicato e nella cartella `note/` dello ZIP. Attivare o nascondere le note non modifica i capoversi del corpo del libro, né la prosecuzione tra pagine.
-- Correzione manuale dei capoversi: il comando **Correggi paragrafi** apre un editor dove una riga vuota indica una separazione. Le correzioni valgono per lettura ed esportazioni testuali; le pagine PDF originali non vengono riscritte.
+- Indice gerarchico libro → capitolo/parte → sottosezione; ogni sottosezione ha una casella di selezione indipendente. Il clic conserva posizione dell'elenco, posizione della pagina e focus da tastiera.
+- EPUB: indice navigabile annidato o titoli HTML h1–h4 per individuare le sottosezioni. Nei PDF si riconoscono anche sezioni numerate come `§ 3` e `1.2`.
+- Lo ZIP contiene un file per ciascuna sottosezione selezionata, con titolo, numero e testo completo; per l'esportazione PDF sono disponibili anche i PDF delle singole sottosezioni. Le voci introduttive prive di sottosezioni restano testi completi senza divisioni inventate.
 - Percorso libro/parte e riferimenti alle pagine PDF nei paragrafi e nell'esportazione JSON.
 - Revisione dell'indice, ricerca, selezione, rinomina, divisione a inizio paragrafo e unione.
 - ZIP con capitoli TXT, Markdown o JSON, paragrafi TXT e indice JSON.

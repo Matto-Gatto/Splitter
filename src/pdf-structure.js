@@ -9,8 +9,10 @@ export function languageOf(text){
 }
 export function structuralHeading(text){
  const s=text.trim().replace(/^\d{1,4}\s+((?:SECTION|SEZIONE)\s*[IVXLCDM]+[.]?)$/i,'$1').replace(/[.·]+$/,'').replace(/^SEC(?:ITON|I[1lI][0Oo]N|[Iil1]ON|T[Il1][O0]N)/i,'SECTION').replace(/^SEZ[l1]ONE/i,'SEZIONE');
+ const numbered=s.match(/^(?:§\s*(\d+(?:\.\d+)*|[IVXLCDM]+)[.:]?|((?:\d+\.)+\d+)[.)]?)\s+(.{1,150})$/);if(numbered)return {kind:'section',number:numbered[1]||numbered[2],suffix:numbered[3]};
  const m=s.match(/^(LIBRO|BOOK|PARTE|PART|CAPITOLO|CHAPTER|SEZIONE|SECTION|SECT\.?|SEZ\.?)\s*([IVXLCDMT\d]+)\b[.:]?\s*(.*)$/i);
- if(m&&s.length<180&&!(/^(?:SECT\.?|SEZ\.?)$/i.test(m[1])&&m[3]))return {kind:/libro|book/i.test(m[1])?'book':/parte|part$/i.test(m[1])?'part':'section',number:m[2].replace(/l/g,'I').toUpperCase(),suffix:m[3]};
+ if(m){const joined=!/^\s/.test(s.slice(m[1].length));if(joined&&m[1]!==m[1].toUpperCase())return null;if(!/^\d+$/.test(m[2])&&m[2]!==m[2].toUpperCase()&&!/^[Il]+$/.test(m[2])&&!(m[1]===m[1].toUpperCase()&&/^[ivxl]+$/.test(m[2])))return null;}
+ if(m&&s.length<180&&!(/^(?:SECT\.?|SEZ\.?)$/i.test(m[1])&&m[3]))return {kind:/libro|book/i.test(m[1])?'book':/parte|part$/i.test(m[1])?'part':/capitolo|chapter/i.test(m[1])?'chapter':'section',number:m[2].replace(/l/g,'I').toUpperCase(),suffix:m[3]};
  if(/^(introduzione|introduction|avvertenza|advertisement|appendice|appendix|note del traduttore|glossario|bibliografia(?: critica)?|cronologia|nota editoriale)\s*[.*]?$/i.test(s))return {kind:'extra',number:s.toLowerCase()};
  return null;
 }
@@ -67,7 +69,7 @@ function editDistance(a,b){const row=Array.from({length:b.length+1},(_,i)=>i);fo
 function findMarker(page,number){const exact=page.body.findIndex(l=>{const h=structuralHeading(l.text);return h?.kind==='section'&&h.number===number;});if(exact>=0)return exact;
  // Only repair malformed Roman labels; a valid, different section number is never guessed away.
  const canonical=/^(?=[IVXLCDM]+$)M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/;
- return page.body.findIndex(l=>{const h=structuralHeading(l.text);return h?.kind==='section'&&l.x>page.width*.18&&!canonical.test(h.number)&&editDistance(h.number,number)<=2;});
+ return page.body.findIndex(l=>{const h=structuralHeading(l.text);return h?.kind==='section'&&/^[IVXLCDMT1l]+$/.test(h.number)&&l.x>page.width*.18&&!canonical.test(h.number)&&editDistance(h.number,number)<=2;});
 }
 function indexBoundaries(pages,toc){
  const {map,offset}=pageMap(pages);let source=toc.entries.filter(e=>e.language==='it');if(source.length<3)source=toc.entries.filter(e=>e.language==='en');
@@ -81,10 +83,11 @@ function headingBoundaries(pages,tocEnd){
  const result=[],ctx={it:{},en:{},und:{}};
  for(const p of pages){if(p.toc)continue;const state=ctx[p.language]||ctx.und;
  for(let i=0;i<p.body.length;i++){const line=p.body[i],h=structuralHeading(line.text);if(!h)continue;
- if(h.kind==='book'){state.book=line.text;state.part='';continue;}if(h.kind==='part'){state.part=line.text;continue;}
- if(h.kind==='section'||h.kind==='extra'){
- const next=p.body[i+1];let title=line.text;if(h.kind==='section'&&next&&next.text.length<180&&next.x>p.width*.20&&!structuralHeading(next.text)&&next.y>line.y-p.bodySize*3.5)title+=' — '+next.text;
- result.push({page:p.pageIndex,line:i,title,number:h.number,kind:h.kind,language:p.language,path:[state.book,state.part].filter(Boolean).join(' · '),method:'heading'});
+ if(h.kind==='book'){state.book=line.text;state.part='';state.chapter='';continue;}if(h.kind==='part'){state.part=line.text;state.chapter='';continue;}
+ if(h.kind==='section'||h.kind==='extra'||h.kind==='chapter'){
+ const next=p.body[i+1];let title=line.text;if((h.kind==='section'||h.kind==='chapter')&&next&&next.text.length<180&&next.x>p.width*.20&&!structuralHeading(next.text)&&next.y>line.y-p.bodySize*3.5)title+=' — '+next.text;
+ result.push({page:p.pageIndex,line:i,title,number:h.number,kind:h.kind,language:p.language,path:[state.book,state.part,h.kind==='section'?state.chapter:''].filter(Boolean).join(' · '),method:'heading'});
+ if(h.kind==='chapter')state.chapter=title;
  }
  }}return result;
 }
@@ -99,7 +102,8 @@ function makeChapters(pages,boundaries,language,notes){
   let skip=1;while(skip<firstChunk.lines.length&&skip<=3){const line=firstChunk.lines[skip];if(line.x<=firstChunk.page.width*.18||structuralHeading(line.text))break;const known=b.method==='printed-toc'||b.method==='facing-toc'||titleKey(b.title).includes(titleKey(line.text));if(!known)break;skip++;}firstChunk.lines=firstChunk.lines.slice(skip);
  }
  const content=segmentParagraphs(chunks);const detectedFootnotes=collectFootnotes(chunks);const footnotes=notes?detectedFootnotes:[];if(!content.paragraphs.length)continue;
- chapters.push({title:b.title,path:b.path,language:language==='original'?b.language:language,method:b.method,...content,detectedFootnotes,footnotes,text:content.paragraphs.join('\n\n'),pageIndices,startPage:pageIndices[0],endPage:pageIndices.at(-1)+1,pdfApproximate:b.line>0||!!end&&end.line>0});}
+ const marker=structuralHeading(pages[b.page]?.body[b.line]?.text||'');
+ chapters.push({title:b.title,path:b.path,kind:b.method==='front-matter'?'front-matter':marker?.kind||b.kind||'chapter',sectionNumber:marker?.kind==='section'?(b.number||marker.number):undefined,language:language==='original'?b.language:language,method:b.method,...content,detectedFootnotes,footnotes,text:content.paragraphs.join('\n\n'),pageIndices,startPage:pageIndices[0],endPage:pageIndices.at(-1)+1,pdfApproximate:b.line>0||!!end&&end.line>0});}
  return chapters;
 }
 export function analyzePdf(pages,entries=[]){
