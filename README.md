@@ -2,16 +2,28 @@
 
 Web app in italiano per suddividere libri PDF ed EPUB in capitoli e paragrafi intesi come **sottosezioni con titolo o numero**. I capoversi tipografici restano nel testo di ciascuna sottosezione. Tutta l'elaborazione avviene nel browser.
 
-## Avvio
+Repository: https://github.com/Matto-Gatto/Splitter
 
-Richiede Node.js 22 o successivo.
+## Server sul tuo computer
 
-```sh
-npm install
-npm run dev
-```
+Il progetto si trova in `C:\App\Splitter\folio`. Node.js è già installato sul PC. L'accesso locale non richiede un account ChatGPT.
 
-`npm run build` crea il sito statico in `dist`. `npm test` verifica le funzioni di segmentazione. `node tests/fixtures.mjs` genera PDF ed EPUB sintetici per verificare l'importazione nel browser.
+- **Avvia-Folio.cmd**: ricostruisce l'app e avvia il server su **http://127.0.0.1:3000/**. In alternativa, dal terminale della cartella: `npm start`.
+- **Sviluppa-Folio.cmd**: avvia lo sviluppo su **http://127.0.0.1:5173/**. Le modifiche ai file in `src/` appaiono nel browser automaticamente. Comando equivalente: `npm run dev -- --port 5173 --strictPort`.
+- **Ferma-Folio.cmd**: ferma il server locale della porta 3000, dopo avere verificato che sia il processo Folio registrato. Se avviato in un terminale, puoi anche premere **Ctrl+C**.
+- **Avvia-Folio-Rete.cmd**: avvio facoltativo per altri dispositivi sulla stessa rete; stampa l'indirizzo LAN del PC. Il normale avvio rimane limitato a questo computer. Le regole del firewall non vengono modificate dagli script.
+
+Il PC deve rimanere acceso e il processo server attivo. Il server distribuisce soltanto `dist/`; i PDF ed EPUB vengono ancora elaborati nel browser. I caratteri web usano Google Fonts, con caratteri di sistema come alternativa.
+
+Per aggiornare una versione già avviata esegui `npm run build` e ricarica il browser. Per una nuova copia del progetto installa le dipendenze con `npm ci`. `HOST` e `PORT` permettono di scegliere indirizzo di ascolto e porta; i valori predefiniti sono `127.0.0.1` e `3000`.
+
+`npm test` verifica segmentazione, esportazione e server locale. `node tests/fixtures.mjs` genera PDF ed EPUB sintetici per verificare l'importazione nel browser.
+
+## Punto di ripresa
+
+La versione corrente usa paragrafi intesi come sottosezioni titolate o numerate e mantiene lo scorrimento durante la selezione. È stata preparata per lavorare e ospitare l'app sul PC, senza modificare la pubblicazione cloud esistente. Il passaggio ancora da scegliere è l'ambito di accesso: solo questo PC, rete locale oppure Internet. L'accesso da Internet non è stato configurato.
+
+Verifiche completate: 36 test, build, avvio e arresto del server, risposta HTTP e apertura dell'app locale nel browser. Il repository contiene codice, test sintetici, istruzioni e script Windows. Libri dell'utente, risultati di analisi, dipendenze installate e file temporanei restano fuori dal repository.
 
 ## Funzioni
 
