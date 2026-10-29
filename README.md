@@ -25,6 +25,8 @@ La versione corrente usa paragrafi intesi come sottosezioni titolate o numerate 
 
 Verifiche completate: 36 test, build, avvio e arresto del server, risposta HTTP e apertura dell'app locale nel browser. Il repository contiene codice, test sintetici, istruzioni e script Windows. Libri dell'utente, risultati di analisi, dipendenze installate e file temporanei restano fuori dal repository.
 
+Chiusura del lavoro del 29 ottobre 2026: codice salvato sul ramo `main` del repository indicato sopra. Per riprendere dopo lo spegnimento, aprire `Avvia-Folio.cmd`, visitare http://127.0.0.1:3000/ e ricaricare il libro. Per modificare il codice usare invece `Sviluppa-Folio.cmd`. Le selezioni e le modifiche a un libro nella pagina non sono persistenti: esportare il risultato prima di chiudere il browser. Prossimo passo da concordare: mantenere l'accesso dal solo PC oppure estenderlo alla rete locale o a Internet. Nessuna esecuzione notturna è stata programmata.
+
 ## Funzioni
 
 - Indice EPUB 3, indice NCX EPUB 2, ripiego sull'ordine di lettura.
